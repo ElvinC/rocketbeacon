@@ -21,7 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdbool.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -39,6 +39,13 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+ADC_HandleTypeDef hadc;
+
+CRC_HandleTypeDef hcrc;
+
+SUBGHZ_HandleTypeDef hsubghz;
+
+UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 
@@ -46,12 +53,294 @@
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+static void MX_ADC_Init(void);
+static void MX_SUBGHZ_Init(void);
+static void MX_USART2_UART_Init(void);
+static void MX_CRC_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+void SetStandbyXOSC() {
+    uint8_t txbuf[2] = {0x80, 0x01};
+    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
+}
+
+void SetPacketTypeLora() {
+    uint8_t txbuf[2] = {0x8A, 0x01};
+    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
+}
+
+void SetPacketTypeFSK() {
+    uint8_t txbuf[2] = {0x8A, 0x00};
+    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
+}
+
+uint32_t ComputeRfFreq(double frequencyMhz) {
+    return (uint32_t)(frequencyMhz * 1048576L); //2^25/(32e6)
+}
+
+void SetRfFreq(uint32_t rfFreq) {
+    uint8_t txbuf[5] = {0x86, (rfFreq & 0xFF000000) >> 24, (rfFreq & 0x00FF0000) >> 16, (rfFreq & 0x0000FF00) >> 8, rfFreq & 0x000000FF};
+    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
+}
+
+void SetPaLowPower() {
+    // set Pa to 14 dB.
+    uint8_t txbuf[5] = {0x95, 0x02, 0x02, 0x00, 0x01};
+    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
+}
+
+void SetPa22dB() {
+    // set Pa to the highest 22 dBm
+    uint8_t txbuf[5] = {0x95, 0x04, 0x07, 0x00, 0x01};
+    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
+}
+
+void SetTxPower(int8_t powerdBm) {
+    // Between -9 and 22
+    uint8_t txbuf[3] = {0x8E, (uint8_t) powerdBm, 0x02};
+    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
+}
+
+void SetContinuousWave() {
+    uint8_t txbuf[1] = {0xD1};
+    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf, 0);
+}
+
+void SetTxInfinitePreamble() {
+    uint8_t txbuf[1] = {0xD2};
+    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf, 0);
+}
+
+void SetTx(uint32_t timeout) {
+    // Timeout * 15.625 µs
+    uint8_t txbuf[4] = {0x83, (timeout & 0x00FF0000) >> 16, (timeout & 0x0000FF00) >> 8, timeout & 0x000000FF};
+    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
+}
+
+void SetRx(uint32_t timeout) {
+    // Timeout * 15.625 µs
+    // 0x000000 No timeout. Rx Single mode
+    // 0xFFFFFF Rx Continuous mode. The device remains in RX mode until the host sends a command to change the operation mode
+    uint8_t txbuf[4] = {0x82, (timeout & 0x00FF0000) >> 16, (timeout & 0x0000FF00) >> 8, timeout & 0x000000FF};
+    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
+}
+
+void SetModulationParamsLora(const uint8_t params[4]) {
+    uint8_t txbuf[5] = {0x8B, params[0], params[1], params[2], params[3]};
+    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
+}
+
+void SetModulationParamsFSK(uint32_t bitrate, uint8_t pulseshape, uint8_t bandwidth, uint32_t freq_dev) {
+    uint32_t BR = 32 * 32e6 / bitrate;
+    uint32_t fdev = (uint32_t) (freq_dev * 1.048576L); // 2^25/32e6 = 1.048576
+    uint8_t txbuf[9] = {0x8B, (BR & 0x00FF0000) >> 16, (BR & 0x0000FF00) >> 8, BR & 0x000000FF, pulseshape, bandwidth, (fdev & 0x00FF0000) >> 16, (fdev & 0x0000FF00) >> 8, fdev & 0x000000FF};
+    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
+}
+
+void SetPacketParamsLora(uint16_t preamble_length, bool header_fixed, uint8_t payload_length, bool crc_enabled, bool invert_iq) {
+    uint8_t txbuf[7] = {0x8C, (uint8_t)((preamble_length >> 8) & 0xFF), (uint8_t)(preamble_length & 0xFF),
+                        (uint8_t) header_fixed, payload_length, (uint8_t) crc_enabled, (uint8_t) invert_iq};
+
+    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
+}
+
+
+void FSKBeep(int8_t powerdBm, uint32_t toneHz, uint32_t lengthMs) {
+    // assume in standbyXOSC already.
+    HAL_Delay(1);
+    SetTxPower(powerdBm);
+    SetModulationParamsFSK(toneHz*2,    0x09,     0x1E,      2500);
+    HAL_Delay(5);
+    SetTxInfinitePreamble();
+    HAL_Delay(lengthMs);
+    SetStandbyXOSC();
+    HAL_Delay(5);
+}
+
+void CWBeep(int8_t powerdBm, uint32_t lengthMs) {
+    HAL_Delay(1);
+    SetTxPower(powerdBm);
+    HAL_Delay(5);
+    SetContinuousWave();
+    HAL_Delay(lengthMs);
+    SetStandbyXOSC();
+    HAL_Delay(5);
+}
+
+
+// letter to morse based on ASCII characters.
+// right-terminated by a "1". 1 is dah, 0 is dit.
+const uint8_t morse_chars[] = {
+        0b11111111,       // Special code for SPACE
+        0b10000000,       // N/A
+        0b10000000,       // N/A
+        0b10000000,       // N/A
+        0b10000000,       // N/A
+        0b10000000,       // N/A
+        0b10000000,       // N/A
+        0b10000000,       // N/A
+        0b10000000,       // N/A
+        0b10000000,       // N/A
+        0b10000000,       // N/A
+        0b10000000,       // N/A
+        0b10000000,       // N/A
+        0b11100000,       // Minus sign (indicated by "M")
+        0b10000000,       // N/A
+        0b10010100,       // "/" Slash
+        0b11111100,       // "0"
+        0b01111100,       // "1"
+        0b00111100,       // "2"
+        0b00011100,       // "3"
+        0b00001100,       // "4"
+        0b00000100,       // "5"
+        0b10000100,       // "6"
+        0b11000100,       // "7"
+        0b11100100,       // "8"
+        0b11110100,       // "9"
+        0b10000000,       // N/A
+        0b10000000,       // N/A
+        0b10000000,       // N/A
+        0b10001100,       // "=" BT prosign/Equal sign
+        0b10000000,       // N/A
+        0b00110010,       // "?" Question mark
+        0b10000000,       // N/A
+        0b01100000,       // "A"
+        0b10001000,       // "B"
+        0b10101000,       // "C"
+        0b10010000,       // "D"
+        0b01000000,       // "E"
+        0b00101000,       // "F"
+        0b11010000,       // "G"
+        0b00001000,       // "H"
+        0b00100000,       // "I"
+        0b01111000,       // "J"
+        0b10110000,       // "K"
+        0b01001000,       // "L"
+        0b11100000,       // "M"
+        0b10100000,       // "N"
+        0b11110000,       // "O"
+        0b01101000,       // "P"
+        0b11011000,       // "Q"
+        0b01010000,       // "R"
+        0b00010000,       // "S"
+        0b11000000,       // "T"
+        0b00110000,       // "U"
+        0b00011000,       // "V"
+        0b01110000,       // "W"
+        0b10011000,       // "X"
+        0b10111000,       // "Y"
+        0b11001000,       // "Z"
+        0b10000000,       // N/A
+        0b10000000,       // N/A
+        0b10000000,       // N/A
+        0b10000000,       // N/A
+        0b10000000,       // N/A
+        0b10000000,       // N/A
+        0b01100000,       // "a"
+        0b10001000,       // "b"
+        0b10101000,       // "c"
+        0b10010000,       // "d"
+        0b01000000,       // "e"
+        0b00101000,       // "f"
+        0b11010000,       // "g"
+        0b00001000,       // "h"
+        0b00100000,       // "i"
+        0b01111000,       // "j"
+        0b10110000,       // "k"
+        0b01001000,       // "l"
+        0b11100000,       // "m"
+        0b10100000,       // "n"
+        0b11110000,       // "o"
+        0b01101000,       // "p"
+        0b11011000,       // "q"
+        0b01010000,       // "r"
+        0b00010000,       // "s"
+        0b11000000,       // "t"
+        0b00110000,       // "u"
+        0b00011000,       // "v"
+        0b01110000,       // "w"
+        0b10011000,       // "x"
+        0b10111000,       // "y"
+        0b11001000        // "z"
+};
+
+// https://en.wikipedia.org/wiki/Morse_code#/media/File:International_Morse_Code.svg
+uint32_t morse_unit_ms = 100;
+int8_t morse_power = 10;
+
+void play_morse_char(uint8_t ascii_letter, bool use_cw) {
+    uint8_t morse_code = 0b11111111;
+    if (ascii_letter > 31 && ascii_letter < 123) {
+        morse_code = morse_chars[ascii_letter - 32];
+    }
+
+    // space
+    if (morse_code == 0b11111111) {
+        if (use_cw) {
+            HAL_Delay(morse_unit_ms);
+        } else {
+            //FSKBeep(morse_power, 750, morse_unit_ms);
+            HAL_Delay(morse_unit_ms);
+        }
+        return;
+    }
+    uint8_t terminatelen = 0;
+    for (uint8_t idx = 0; idx < 8; idx++) {
+        if (morse_code & (1 << idx)) {
+            terminatelen = idx;
+            break;
+        }
+    }
+
+    for (uint8_t i = 7; i > terminatelen; i--) {
+        if (morse_code & (1 << i)) {
+            // make dat
+            //printf("-");
+            if (use_cw) {
+                CWBeep(morse_power, morse_unit_ms * 3);
+            } else {
+                FSKBeep(morse_power, 750, morse_unit_ms * 3);
+            }
+        } else {
+            // make dit
+            //printf(".");
+            if (use_cw) {
+                CWBeep(morse_power, morse_unit_ms);
+            } else {
+                FSKBeep(morse_power, 750, morse_unit_ms);
+            }
+        }
+
+        // Make delay.
+        if (use_cw) {
+            HAL_Delay(morse_unit_ms);
+        } else {
+            HAL_Delay(morse_unit_ms);
+            //CWBeep(morse_power, morse_unit_ms);
+        }
+    }
+}
+
+void play_morse_word(uint8_t* letters, uint8_t len, bool use_cw) {
+    for (uint8_t i = 0; i < len; i++) {
+        play_morse_char(letters[i], use_cw);
+
+        // Space between letters
+        if (use_cw) {
+            HAL_Delay(morse_unit_ms * 3);
+        } else {
+            //CWBeep(morse_power, morse_unit_ms);
+            HAL_Delay(morse_unit_ms * 3);
+        }
+    }
+}
+
 
 /* USER CODE END 0 */
 
@@ -82,7 +371,34 @@ int main(void)
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
+  MX_GPIO_Init();
+  MX_ADC_Init();
+  MX_SUBGHZ_Init();
+  MX_USART2_UART_Init();
+  MX_CRC_Init();
   /* USER CODE BEGIN 2 */
+
+  //EE_Status ee_status = EE_OK;
+
+  HAL_Delay(1000); // initial start
+  SetStandbyXOSC();
+  HAL_Delay(1);
+  SetPacketTypeLora();
+  HAL_Delay(1);
+  //SetPaLowPower();
+  SetPa22dB();
+  HAL_Delay(1);
+  SetTxPower(-9);
+  HAL_Delay(1);
+
+  SetPacketTypeFSK();
+
+  SetModulationParamsFSK(2000,    0x09,     0x1E,      3000);
+
+  double center_freq = 446.14375;
+
+  SetRfFreq(ComputeRfFreq(center_freq));
+
 
   /* USER CODE END 2 */
 
@@ -90,6 +406,26 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+      HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
+      FSKBeep(-9, 500, 200);
+
+      HAL_Delay(50);
+
+      FSKBeep(2, 750, 200);
+
+      HAL_Delay(50);
+
+      FSKBeep(10, 1000, 200);
+      HAL_Delay(50);
+
+      HAL_Delay(1000);
+      uint8_t callsign[] = "CALLSIGN";
+      play_morse_word(callsign, sizeof(callsign)-1, false);
+
+      HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
+
+      HAL_Delay(3000);
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -112,10 +448,9 @@ void SystemClock_Config(void)
 
   /** Initializes the CPU, AHB and APB buses clocks
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_MSI;
-  RCC_OscInitStruct.MSIState = RCC_MSI_ON;
-  RCC_OscInitStruct.MSICalibrationValue = RCC_MSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_6;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.HSEDiv = RCC_HSE_DIV2;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
@@ -127,16 +462,210 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK3|RCC_CLOCKTYPE_HCLK
                               |RCC_CLOCKTYPE_SYSCLK|RCC_CLOCKTYPE_PCLK1
                               |RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_MSI;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSE;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV16;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
-  RCC_ClkInitStruct.AHBCLK3Divider = RCC_SYSCLK_DIV1;
+  RCC_ClkInitStruct.AHBCLK3Divider = RCC_SYSCLK_DIV16;
 
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
   {
     Error_Handler();
   }
+
+  /** Enable the HSE Prescaler
+  */
+  __HAL_RCC_HSE_DIV2_ENABLE();
+}
+
+/**
+  * @brief ADC Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC_Init(void)
+{
+
+  /* USER CODE BEGIN ADC_Init 0 */
+
+  /* USER CODE END ADC_Init 0 */
+
+  /* USER CODE BEGIN ADC_Init 1 */
+
+  /* USER CODE END ADC_Init 1 */
+
+  /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
+  */
+  hadc.Instance = ADC;
+  hadc.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
+  hadc.Init.Resolution = ADC_RESOLUTION_12B;
+  hadc.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc.Init.ScanConvMode = ADC_SCAN_DISABLE;
+  hadc.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  hadc.Init.LowPowerAutoWait = DISABLE;
+  hadc.Init.LowPowerAutoPowerOff = DISABLE;
+  hadc.Init.ContinuousConvMode = DISABLE;
+  hadc.Init.NbrOfConversion = 1;
+  hadc.Init.DiscontinuousConvMode = DISABLE;
+  hadc.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc.Init.DMAContinuousRequests = DISABLE;
+  hadc.Init.Overrun = ADC_OVR_DATA_PRESERVED;
+  hadc.Init.SamplingTimeCommon1 = ADC_SAMPLETIME_1CYCLE_5;
+  hadc.Init.SamplingTimeCommon2 = ADC_SAMPLETIME_1CYCLE_5;
+  hadc.Init.OversamplingMode = DISABLE;
+  hadc.Init.TriggerFrequencyMode = ADC_TRIGGER_FREQ_HIGH;
+  if (HAL_ADC_Init(&hadc) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC_Init 2 */
+
+  /* USER CODE END ADC_Init 2 */
+
+}
+
+/**
+  * @brief CRC Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_CRC_Init(void)
+{
+
+  /* USER CODE BEGIN CRC_Init 0 */
+
+  /* USER CODE END CRC_Init 0 */
+
+  /* USER CODE BEGIN CRC_Init 1 */
+
+  /* USER CODE END CRC_Init 1 */
+  hcrc.Instance = CRC;
+  hcrc.Init.DefaultPolynomialUse = DEFAULT_POLYNOMIAL_ENABLE;
+  hcrc.Init.DefaultInitValueUse = DEFAULT_INIT_VALUE_ENABLE;
+  hcrc.Init.InputDataInversionMode = CRC_INPUTDATA_INVERSION_NONE;
+  hcrc.Init.OutputDataInversionMode = CRC_OUTPUTDATA_INVERSION_DISABLE;
+  hcrc.InputDataFormat = CRC_INPUTDATA_FORMAT_BYTES;
+  if (HAL_CRC_Init(&hcrc) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN CRC_Init 2 */
+
+  /* USER CODE END CRC_Init 2 */
+
+}
+
+/**
+  * @brief SUBGHZ Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SUBGHZ_Init(void)
+{
+
+  /* USER CODE BEGIN SUBGHZ_Init 0 */
+
+  /* USER CODE END SUBGHZ_Init 0 */
+
+  /* USER CODE BEGIN SUBGHZ_Init 1 */
+
+  /* USER CODE END SUBGHZ_Init 1 */
+  hsubghz.Init.BaudratePrescaler = SUBGHZSPI_BAUDRATEPRESCALER_8;
+  if (HAL_SUBGHZ_Init(&hsubghz) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SUBGHZ_Init 2 */
+
+  /* USER CODE END SUBGHZ_Init 2 */
+
+}
+
+/**
+  * @brief USART2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART2_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART2_Init 0 */
+
+  /* USER CODE END USART2_Init 0 */
+
+  /* USER CODE BEGIN USART2_Init 1 */
+
+  /* USER CODE END USART2_Init 1 */
+  huart2.Instance = USART2;
+  huart2.Init.BaudRate = 9600;
+  huart2.Init.WordLength = UART_WORDLENGTH_8B;
+  huart2.Init.StopBits = UART_STOPBITS_1;
+  huart2.Init.Parity = UART_PARITY_NONE;
+  huart2.Init.Mode = UART_MODE_TX_RX;
+  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart2.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart2.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+  huart2.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetTxFifoThreshold(&huart2, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetRxFifoThreshold(&huart2, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_DisableFifoMode(&huart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART2_Init 2 */
+
+  /* USER CODE END USART2_Init 2 */
+
+}
+
+/**
+  * @brief GPIO Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_GPIO_Init(void)
+{
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+  /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOH_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : CONF_440_Pin CONF_868_Pin */
+  GPIO_InitStruct.Pin = CONF_440_Pin|CONF_868_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : LED_Pin */
+  GPIO_InitStruct.Pin = LED_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : BOOT_Pin */
+  GPIO_InitStruct.Pin = BOOT_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(BOOT_GPIO_Port, &GPIO_InitStruct);
+
 }
 
 /* USER CODE BEGIN 4 */

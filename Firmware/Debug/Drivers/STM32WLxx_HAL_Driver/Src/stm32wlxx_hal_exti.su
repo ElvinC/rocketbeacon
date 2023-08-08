@@ -1,0 +1,9 @@
+../Drivers/STM32WLxx_HAL_Driver/Src/stm32wlxx_hal_exti.c:143:19:HAL_EXTI_SetConfigLine	40	static
+../Drivers/STM32WLxx_HAL_Driver/Src/stm32wlxx_hal_exti.c:275:19:HAL_EXTI_GetConfigLine	40	static
+../Drivers/STM32WLxx_HAL_Driver/Src/stm32wlxx_hal_exti.c:375:19:HAL_EXTI_ClearConfigLine	40	static
+../Drivers/STM32WLxx_HAL_Driver/Src/stm32wlxx_hal_exti.c:447:19:HAL_EXTI_RegisterCallback	32	static
+../Drivers/STM32WLxx_HAL_Driver/Src/stm32wlxx_hal_exti.c:473:19:HAL_EXTI_GetHandle	16	static
+../Drivers/STM32WLxx_HAL_Driver/Src/stm32wlxx_hal_exti.c:514:6:HAL_EXTI_IRQHandler	32	static
+../Drivers/STM32WLxx_HAL_Driver/Src/stm32wlxx_hal_exti.c:552:10:HAL_EXTI_GetPending	40	static
+../Drivers/STM32WLxx_HAL_Driver/Src/stm32wlxx_hal_exti.c:588:6:HAL_EXTI_ClearPending	32	static
+../Drivers/STM32WLxx_HAL_Driver/Src/stm32wlxx_hal_exti.c:615:6:HAL_EXTI_GenerateSWI	32	static

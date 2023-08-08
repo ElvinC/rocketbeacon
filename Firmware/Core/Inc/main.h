@@ -31,7 +31,7 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "eeprom_emul.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -57,6 +57,14 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define CONF_440_Pin GPIO_PIN_3
+#define CONF_440_GPIO_Port GPIOB
+#define CONF_868_Pin GPIO_PIN_4
+#define CONF_868_GPIO_Port GPIOB
+#define LED_Pin GPIO_PIN_9
+#define LED_GPIO_Port GPIOA
+#define BOOT_Pin GPIO_PIN_3
+#define BOOT_GPIO_Port GPIOH
 
 /* USER CODE BEGIN Private defines */
 

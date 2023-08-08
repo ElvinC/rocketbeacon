@@ -1,0 +1,2 @@
+../Core/Src/system_stm32wlxx.c:211:6:SystemInit	4	static
+../Core/Src/system_stm32wlxx.c:266:6:SystemCoreClockUpdate	32	static
