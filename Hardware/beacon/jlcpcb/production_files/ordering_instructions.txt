@@ -1,0 +1,9 @@
+JLCPCB Ordering options. If not specified, use defaults.
+
+Layers=2
+Thickness=1.6
+Vias=Tented
+Remove order number=Specify a location
+PCBA type=Economic
+Assembly side=Top side
+Tooling holes = Added by Customer

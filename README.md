@@ -3,7 +3,7 @@ Configurable sub-GHz radio beacon for amateur rocketry.
 
 **Warning: make sure to comply with your local RF regulations. Some frequency bands require an amateur rocketry license, others have power or duty cycle limitations.**
 
-# Hardware
+## Hardware
 The hardware is designed in KiCad for assembly with JLCPCB. Two versions of the RF front end are available, one optimized for the 220 MHz band and one for the 440 MHz band. Note that the 220 version is still untested.
 
 The hardware features:
@@ -13,7 +13,7 @@ The hardware features:
 * CR2032 battery holder
 * Can be powered externally by 3.3-5V
 
-# Assembly
+## Assembly
 Other than the assembled PCB, an antenna is required. For a basic quarter wave copper antenna, you can use `length = 0.95 * 0.25 * speed of light / frequency`, where 0.95 is the velocity factor of copper. E.g.
 
 * For 433 MHz, use a 165mm
@@ -24,12 +24,12 @@ If powered by a button cell battery, solder on a [MY-2032-12](https://www.lcsc.c
 If powered by an external battery (e.g. 1s lipo), connect to the V+ and GND pins. Note that it doesn't have reverse polarity protection, so double check the polarity!
 
 
-# Compile and program
+## Compile and program
 The firmware can be modified and compiled with [STM32CubeIDE](https://www.st.com/en/development-tools/stm32cubeide.html).
 
 The main code is located in `Firmware\Core\Src\main.c`
 
-Programming the firmware can be done with [STM32CubeProg](https://www.st.com/en/development-tools/stm32cubeprog.html) and a cheap FTDI to USB dongle.
+Programming the firmware can be done with [STM32CubeProg](https://www.st.com/en/development-tools/stm32cubeprog.html) and a cheap UART to USB dongle (Search "ftdi adaptor" and get one of the red dongles 6 pins)
 
 * Disconnect power
 * Hold down the button
@@ -40,5 +40,5 @@ Programming the firmware can be done with [STM32CubeProg](https://www.st.com/en/
 * Cycle power to execute the code.
 
 
-# Configuration
+## Configuration
 TODO: Make a little UART configuration interface to set frequency, callsign etc.
