@@ -60,215 +60,156 @@ static void MX_USART2_UART_Init(void);
 static void MX_CRC_Init(void);
 /* USER CODE BEGIN PFP */
 
+void SetStandbyXOSC();
+void SetPacketTypeLora();
+void SetPacketTypeFSK();
+uint32_t ComputeRfFreq(double frequencyMhz);
+void SetRfFreq(uint32_t rfFreq);
+void SetPaLowPower();
+void SetPa22dB();
+void SetTxPower(int8_t powerdBm);
+void SetContinuousWave();
+void SetTxInfinitePreamble();
+void SetTx(uint32_t timeout);
+void SetRx(uint32_t timeout);
+void SetModulationParamsLora(const uint8_t params[4]);
+void SetModulationParamsFSK(uint32_t bitrate, uint8_t pulseshape, uint8_t bandwidth, uint32_t freq_dev);
+void SetPacketParamsLora(uint16_t preamble_length, bool header_fixed, uint8_t payload_length, bool crc_enabled, bool invert_iq);
+void FSKBeep(int8_t powerdBm, uint32_t toneHz, uint32_t lengthMs);
+void CWBeep(int8_t powerdBm, uint32_t lengthMs);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-void SetStandbyXOSC() {
-    uint8_t txbuf[2] = {0x80, 0x01};
-    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
-}
+// standard frequencies. Note: zero indexed.
+const double LPD433[69] = {
+    433.075, 433.100, 433.125, 433.150, 433.175, 433.200, 433.225, 433.250, 433.275, 433.300, // 1-10
+    433.325, 433.350, 433.375, 433.400, 433.425, 433.450, 433.475, 433.500, 433.525, 433.550, // 11-20
+    433.575, 433.600, 433.625, 433.650, 433.675, 433.700, 433.725, 433.750, 433.775, 433.800, // 21-30
+    433.825, 433.850, 433.875, 433.900, 433.925, 433.950, 433.975, 434.000, 434.025, 434.050, // 31-40
+    434.075, 434.100, 434.125, 434.150, 434.175, 434.200, 434.225, 434.250, 434.275, 434.300, // 41-50
+    434.325, 434.350, 434.375, 434.400, 434.425, 434.450, 434.475, 434.500, 434.525, 434.550, // 51-60
+    434.575, 434.600, 434.625, 434.650, 434.675, 434.700, 434.725, 434.750, 434.775           // 61-69
+};
 
-void SetPacketTypeLora() {
-    uint8_t txbuf[2] = {0x8A, 0x01};
-    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
-}
+const double PMR446[16] = {
+    446.00625, 446.01875, 446.03125, 446.04375, 446.05625, // 1-5
+    446.06875, 446.08125, 446.09375, 446.10625, 446.11875, // 6-10
+    446.13125, 446.14375, 446.15625, 446.16875, 446.18125, // 11-15
+    446.19375 // 16
+};
 
-void SetPacketTypeFSK() {
-    uint8_t txbuf[2] = {0x8A, 0x00};
-    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
-}
-
-uint32_t ComputeRfFreq(double frequencyMhz) {
-    return (uint32_t)(frequencyMhz * 1048576L); //2^25/(32e6)
-}
-
-void SetRfFreq(uint32_t rfFreq) {
-    uint8_t txbuf[5] = {0x86, (rfFreq & 0xFF000000) >> 24, (rfFreq & 0x00FF0000) >> 16, (rfFreq & 0x0000FF00) >> 8, rfFreq & 0x000000FF};
-    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
-}
-
-void SetPaLowPower() {
-    // set Pa to 14 dB.
-    uint8_t txbuf[5] = {0x95, 0x02, 0x02, 0x00, 0x01};
-    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
-}
-
-void SetPa22dB() {
-    // set Pa to the highest 22 dBm
-    uint8_t txbuf[5] = {0x95, 0x04, 0x07, 0x00, 0x01};
-    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
-}
-
-void SetTxPower(int8_t powerdBm) {
-    // Between -9 and 22
-    uint8_t txbuf[3] = {0x8E, (uint8_t) powerdBm, 0x02};
-    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
-}
-
-void SetContinuousWave() {
-    uint8_t txbuf[1] = {0xD1};
-    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf, 0);
-}
-
-void SetTxInfinitePreamble() {
-    uint8_t txbuf[1] = {0xD2};
-    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf, 0);
-}
-
-void SetTx(uint32_t timeout) {
-    // Timeout * 15.625 µs
-    uint8_t txbuf[4] = {0x83, (timeout & 0x00FF0000) >> 16, (timeout & 0x0000FF00) >> 8, timeout & 0x000000FF};
-    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
-}
-
-void SetRx(uint32_t timeout) {
-    // Timeout * 15.625 µs
-    // 0x000000 No timeout. Rx Single mode
-    // 0xFFFFFF Rx Continuous mode. The device remains in RX mode until the host sends a command to change the operation mode
-    uint8_t txbuf[4] = {0x82, (timeout & 0x00FF0000) >> 16, (timeout & 0x0000FF00) >> 8, timeout & 0x000000FF};
-    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
-}
-
-void SetModulationParamsLora(const uint8_t params[4]) {
-    uint8_t txbuf[5] = {0x8B, params[0], params[1], params[2], params[3]};
-    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
-}
-
-void SetModulationParamsFSK(uint32_t bitrate, uint8_t pulseshape, uint8_t bandwidth, uint32_t freq_dev) {
-    uint32_t BR = 32 * 32e6 / bitrate;
-    uint32_t fdev = (uint32_t) (freq_dev * 1.048576L); // 2^25/32e6 = 1.048576
-    uint8_t txbuf[9] = {0x8B, (BR & 0x00FF0000) >> 16, (BR & 0x0000FF00) >> 8, BR & 0x000000FF, pulseshape, bandwidth, (fdev & 0x00FF0000) >> 16, (fdev & 0x0000FF00) >> 8, fdev & 0x000000FF};
-    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
-}
-
-void SetPacketParamsLora(uint16_t preamble_length, bool header_fixed, uint8_t payload_length, bool crc_enabled, bool invert_iq) {
-    uint8_t txbuf[7] = {0x8C, (uint8_t)((preamble_length >> 8) & 0xFF), (uint8_t)(preamble_length & 0xFF),
-                        (uint8_t) header_fixed, payload_length, (uint8_t) crc_enabled, (uint8_t) invert_iq};
-
-    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
-}
-
-
-void FSKBeep(int8_t powerdBm, uint32_t toneHz, uint32_t lengthMs) {
-    // assume in standbyXOSC already.
-    HAL_Delay(1);
-    SetTxPower(powerdBm);
-    SetModulationParamsFSK(toneHz*2,    0x09,     0x1E,      2500);
-    HAL_Delay(5);
-    SetTxInfinitePreamble();
-    HAL_Delay(lengthMs);
-    SetStandbyXOSC();
-    HAL_Delay(5);
-}
-
-void CWBeep(int8_t powerdBm, uint32_t lengthMs) {
-    HAL_Delay(1);
-    SetTxPower(powerdBm);
-    HAL_Delay(5);
-    SetContinuousWave();
-    HAL_Delay(lengthMs);
-    SetStandbyXOSC();
-    HAL_Delay(5);
-}
+const double FRS[22] = {
+    462.5625, 462.5875, 462.6125, 462.6375, 462.6625, 462.6875, 462.7125, 467.5625, 467.5875, 467.6125, // 1-10
+    467.6375, 467.6625, 467.6875, 467.7125, 462.5500, 462.5750, 462.6000, 462.6250, 462.6500, 462.6750, // 11-20
+    462.7000, 462.7250 // 21-22
+};
 
 
 // letter to morse based on ASCII characters.
 // right-terminated by a "1". 1 is dah, 0 is dit.
 const uint8_t morse_chars[] = {
-        0b11111111,       // Special code for SPACE
-        0b10000000,       // N/A
-        0b10000000,       // N/A
-        0b10000000,       // N/A
-        0b10000000,       // N/A
-        0b10000000,       // N/A
-        0b10000000,       // N/A
-        0b10000000,       // N/A
-        0b10000000,       // N/A
-        0b10000000,       // N/A
-        0b10000000,       // N/A
-        0b10000000,       // N/A
-        0b10000000,       // N/A
-        0b11100000,       // Minus sign (indicated by "M")
-        0b10000000,       // N/A
-        0b10010100,       // "/" Slash
-        0b11111100,       // "0"
-        0b01111100,       // "1"
-        0b00111100,       // "2"
-        0b00011100,       // "3"
-        0b00001100,       // "4"
-        0b00000100,       // "5"
-        0b10000100,       // "6"
-        0b11000100,       // "7"
-        0b11100100,       // "8"
-        0b11110100,       // "9"
-        0b10000000,       // N/A
-        0b10000000,       // N/A
-        0b10000000,       // N/A
-        0b10001100,       // "=" BT prosign/Equal sign
-        0b10000000,       // N/A
-        0b00110010,       // "?" Question mark
-        0b10000000,       // N/A
-        0b01100000,       // "A"
-        0b10001000,       // "B"
-        0b10101000,       // "C"
-        0b10010000,       // "D"
-        0b01000000,       // "E"
-        0b00101000,       // "F"
-        0b11010000,       // "G"
-        0b00001000,       // "H"
-        0b00100000,       // "I"
-        0b01111000,       // "J"
-        0b10110000,       // "K"
-        0b01001000,       // "L"
-        0b11100000,       // "M"
-        0b10100000,       // "N"
-        0b11110000,       // "O"
-        0b01101000,       // "P"
-        0b11011000,       // "Q"
-        0b01010000,       // "R"
-        0b00010000,       // "S"
-        0b11000000,       // "T"
-        0b00110000,       // "U"
-        0b00011000,       // "V"
-        0b01110000,       // "W"
-        0b10011000,       // "X"
-        0b10111000,       // "Y"
-        0b11001000,       // "Z"
-        0b10000000,       // N/A
-        0b10000000,       // N/A
-        0b10000000,       // N/A
-        0b10000000,       // N/A
-        0b10000000,       // N/A
-        0b10000000,       // N/A
-        0b01100000,       // "a"
-        0b10001000,       // "b"
-        0b10101000,       // "c"
-        0b10010000,       // "d"
-        0b01000000,       // "e"
-        0b00101000,       // "f"
-        0b11010000,       // "g"
-        0b00001000,       // "h"
-        0b00100000,       // "i"
-        0b01111000,       // "j"
-        0b10110000,       // "k"
-        0b01001000,       // "l"
-        0b11100000,       // "m"
-        0b10100000,       // "n"
-        0b11110000,       // "o"
-        0b01101000,       // "p"
-        0b11011000,       // "q"
-        0b01010000,       // "r"
-        0b00010000,       // "s"
-        0b11000000,       // "t"
-        0b00110000,       // "u"
-        0b00011000,       // "v"
-        0b01110000,       // "w"
-        0b10011000,       // "x"
-        0b10111000,       // "y"
-        0b11001000        // "z"
+    0b11111111,       // Special code for SPACE
+    0b10000000,       // N/A
+    0b10000000,       // N/A
+    0b10000000,       // N/A
+    0b10000000,       // N/A
+    0b10000000,       // N/A
+    0b10000000,       // N/A
+    0b10000000,       // N/A
+    0b10000000,       // N/A
+    0b10000000,       // N/A
+    0b10000000,       // N/A
+    0b10000000,       // N/A
+    0b10000000,       // N/A
+    0b10000110,       // - Hyphen sign
+    0b10000000,       // N/A
+    0b10010100,       // "/" Slash
+    0b11111100,       // "0"
+    0b01111100,       // "1"
+    0b00111100,       // "2"
+    0b00011100,       // "3"
+    0b00001100,       // "4"
+    0b00000100,       // "5"
+    0b10000100,       // "6"
+    0b11000100,       // "7"
+    0b11100100,       // "8"
+    0b11110100,       // "9"
+    0b10000000,       // N/A
+    0b10000000,       // N/A
+    0b10000000,       // N/A
+    0b10001100,       // "=" BT prosign/Equal sign
+    0b10000000,       // N/A
+    0b00110010,       // "?" Question mark
+    0b10000000,       // N/A
+    0b01100000,       // "A"
+    0b10001000,       // "B"
+    0b10101000,       // "C"
+    0b10010000,       // "D"
+    0b01000000,       // "E"
+    0b00101000,       // "F"
+    0b11010000,       // "G"
+    0b00001000,       // "H"
+    0b00100000,       // "I"
+    0b01111000,       // "J"
+    0b10110000,       // "K"
+    0b01001000,       // "L"
+    0b11100000,       // "M"
+    0b10100000,       // "N"
+    0b11110000,       // "O"
+    0b01101000,       // "P"
+    0b11011000,       // "Q"
+    0b01010000,       // "R"
+    0b00010000,       // "S"
+    0b11000000,       // "T"
+    0b00110000,       // "U"
+    0b00011000,       // "V"
+    0b01110000,       // "W"
+    0b10011000,       // "X"
+    0b10111000,       // "Y"
+    0b11001000,       // "Z"
+    0b10000000,       // N/A
+    0b10000000,       // N/A
+    0b10000000,       // N/A
+    0b10000000,       // N/A
+    0b10000000,       // N/A
+    0b10000000,       // N/A
+    0b01100000,       // "a"
+    0b10001000,       // "b"
+    0b10101000,       // "c"
+    0b10010000,       // "d"
+    0b01000000,       // "e"
+    0b00101000,       // "f"
+    0b11010000,       // "g"
+    0b00001000,       // "h"
+    0b00100000,       // "i"
+    0b01111000,       // "j"
+    0b10110000,       // "k"
+    0b01001000,       // "l"
+    0b11100000,       // "m"
+    0b10100000,       // "n"
+    0b11110000,       // "o"
+    0b01101000,       // "p"
+    0b11011000,       // "q"
+    0b01010000,       // "r"
+    0b00010000,       // "s"
+    0b11000000,       // "t"
+    0b00110000,       // "u"
+    0b00011000,       // "v"
+    0b01110000,       // "w"
+    0b10011000,       // "x"
+    0b10111000,       // "y"
+    0b11001000        // "z"
 };
+
+void LED_on() {
+    HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
+}
+void LED_off() {
+    HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
+}
 
 // https://en.wikipedia.org/wiki/Morse_code#/media/File:International_Morse_Code.svg
 uint32_t morse_unit_ms = 100;
@@ -341,7 +282,6 @@ void play_morse_word(uint8_t* letters, uint8_t len, bool use_cw) {
     }
 }
 
-
 /* USER CODE END 0 */
 
 /**
@@ -379,34 +319,47 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   //EE_Status ee_status = EE_OK;
-
-  HAL_Delay(1000); // initial start
+  HAL_Delay(6000); // initial start
   SetStandbyXOSC();
   HAL_Delay(1);
   SetPacketTypeLora();
   HAL_Delay(1);
-  //SetPaLowPower();
-  SetPa22dB();
+
+  //SetPaLowPower(); // For powers up to 14 dBm
+  SetPa22dB(); // Uncomment for powers up to 22 dBm
   HAL_Delay(1);
   SetTxPower(-9);
   HAL_Delay(1);
 
   SetPacketTypeFSK();
 
-  SetModulationParamsFSK(2000,    0x09,     0x1E,      3000);
+  SetModulationParamsFSK(2000,    0x09,     0x1E,      2500);
 
-  double center_freq = 446.14375;
+  // Frequency setting in MHz
+  double center_freq = PMR446[13-1] ;//434.700;
+  //double center_freq = 223.010;
+  double freq_correction = 0.99999539941; // Try trimming caps
 
-  SetRfFreq(ComputeRfFreq(center_freq));
+  SetRfFreq(ComputeRfFreq(center_freq * freq_correction));
 
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+
+  /*
+  while (1) {
+      // Emulate comspec beacon at 40 mW
+      LED_on();
+      CWBeep(16, 50);
+      LED_off();
+      HAL_Delay(1000);
+  }*/
+
   while (1)
   {
-      HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
+      LED_on();
       FSKBeep(-9, 500, 200);
 
       HAL_Delay(50);
@@ -415,16 +368,17 @@ int main(void)
 
       HAL_Delay(50);
 
-      FSKBeep(10, 1000, 200);
+      FSKBeep(14, 1000, 200);
       HAL_Delay(50);
 
-      HAL_Delay(1000);
-      uint8_t callsign[] = "CALLSIGN";
-      play_morse_word(callsign, sizeof(callsign)-1, false);
+      //HAL_Delay(1000);
+      //uint8_t callsign[] = "HI";
+      //play_morse_word(callsign, sizeof(callsign)-1, false);
 
-      HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 
-      HAL_Delay(3000);
+      LED_off();
+
+      HAL_Delay(4000);
 
     /* USER CODE END WHILE */
 
@@ -669,7 +623,113 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void SetStandbyXOSC() {
+    uint8_t txbuf[2] = {0x80, 0x01};
+    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
+}
 
+void SetPacketTypeLora() {
+    uint8_t txbuf[2] = {0x8A, 0x01};
+    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
+}
+
+void SetPacketTypeFSK() {
+    uint8_t txbuf[2] = {0x8A, 0x00};
+    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
+}
+
+uint32_t ComputeRfFreq(double frequencyMhz) {
+    return (uint32_t)(frequencyMhz * 1048576L); //2^25/(32e6)
+}
+
+void SetRfFreq(uint32_t rfFreq) {
+    uint8_t txbuf[5] = {0x86, (rfFreq & 0xFF000000) >> 24, (rfFreq & 0x00FF0000) >> 16, (rfFreq & 0x0000FF00) >> 8, rfFreq & 0x000000FF};
+    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
+}
+
+void SetPaLowPower() {
+    // set Pa to 14 dB.
+    uint8_t txbuf[5] = {0x95, 0x02, 0x02, 0x00, 0x01};
+    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
+}
+
+void SetPa22dB() {
+    // set Pa to the highest 22 dBm
+    uint8_t txbuf[5] = {0x95, 0x04, 0x07, 0x00, 0x01};
+    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
+}
+
+void SetTxPower(int8_t powerdBm) {
+    // Between -9 and 22
+    uint8_t txbuf[3] = {0x8E, (uint8_t) powerdBm, 0x02};
+    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
+}
+
+void SetContinuousWave() {
+    uint8_t txbuf[1] = {0xD1};
+    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf, 0);
+}
+
+void SetTxInfinitePreamble() {
+    uint8_t txbuf[1] = {0xD2};
+    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf, 0);
+}
+
+void SetTx(uint32_t timeout) {
+    // Timeout * 15.625 µs
+    uint8_t txbuf[4] = {0x83, (timeout & 0x00FF0000) >> 16, (timeout & 0x0000FF00) >> 8, timeout & 0x000000FF};
+    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
+}
+
+void SetRx(uint32_t timeout) {
+    // Timeout * 15.625 µs
+    // 0x000000 No timeout. Rx Single mode
+    // 0xFFFFFF Rx Continuous mode. The device remains in RX mode until the host sends a command to change the operation mode
+    uint8_t txbuf[4] = {0x82, (timeout & 0x00FF0000) >> 16, (timeout & 0x0000FF00) >> 8, timeout & 0x000000FF};
+    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
+}
+
+void SetModulationParamsLora(const uint8_t params[4]) {
+    uint8_t txbuf[5] = {0x8B, params[0], params[1], params[2], params[3]};
+    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
+}
+
+void SetModulationParamsFSK(uint32_t bitrate, uint8_t pulseshape, uint8_t bandwidth, uint32_t freq_dev) {
+    uint32_t BR = 32 * 32e6 / bitrate;
+    uint32_t fdev = (uint32_t) (freq_dev * 1.048576L); // 2^25/32e6 = 1.048576
+    uint8_t txbuf[9] = {0x8B, (BR & 0x00FF0000) >> 16, (BR & 0x0000FF00) >> 8, BR & 0x000000FF, pulseshape, bandwidth, (fdev & 0x00FF0000) >> 16, (fdev & 0x0000FF00) >> 8, fdev & 0x000000FF};
+    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
+}
+
+void SetPacketParamsLora(uint16_t preamble_length, bool header_fixed, uint8_t payload_length, bool crc_enabled, bool invert_iq) {
+    uint8_t txbuf[7] = {0x8C, (uint8_t)((preamble_length >> 8) & 0xFF), (uint8_t)(preamble_length & 0xFF),
+                        (uint8_t) header_fixed, payload_length, (uint8_t) crc_enabled, (uint8_t) invert_iq};
+
+    HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
+}
+
+
+void FSKBeep(int8_t powerdBm, uint32_t toneHz, uint32_t lengthMs) {
+    // assume in standbyXOSC already.
+    HAL_Delay(1);
+    SetTxPower(powerdBm);
+    SetModulationParamsFSK(toneHz*2,    0x09,     0x1E,      2500);
+    HAL_Delay(5);
+    SetTxInfinitePreamble();
+    HAL_Delay(lengthMs);
+    SetStandbyXOSC();
+    HAL_Delay(5);
+}
+
+void CWBeep(int8_t powerdBm, uint32_t lengthMs) {
+    HAL_Delay(1);
+    SetTxPower(powerdBm);
+    HAL_Delay(5);
+    SetContinuousWave();
+    HAL_Delay(lengthMs);
+    SetStandbyXOSC();
+    HAL_Delay(5);
+}
 /* USER CODE END 4 */
 
 /**
