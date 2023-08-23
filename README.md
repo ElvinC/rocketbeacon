@@ -1,7 +1,7 @@
 # rocketbeacon (Work in progress)
 Configurable sub-GHz radio beacon for amateur rocketry.
 
-**Warning: make sure to comply with your local RF regulations. Some frequency bands require an amateur rocketry license, others have power or duty cycle limitations.**
+**Warning: make sure to comply with your local RF regulations. Some frequency bands require an amateur radio license, others have power or duty cycle limitations.**
 
 ## Hardware
 The hardware is designed in KiCad for assembly with JLCPCB. Two versions of the RF front end are available, one optimized for the 220 MHz band and one for the 440 MHz band. Note that the 220 version is still untested.
@@ -27,7 +27,15 @@ If powered by an external battery (e.g. 1s lipo), connect to the V+ and GND pins
 ## Compile and program
 The firmware can be modified and compiled with [STM32CubeIDE](https://www.st.com/en/development-tools/stm32cubeide.html).
 
-The main code is located in `Firmware\Core\Src\main.c`
+The main code is located in `Firmware\Core\Src\main.c`. There are three main functions used to generate RF signals:
+
+* `FSKBeep(int8_t powerdBm, uint32_t toneHz, uint32_t lengthMs)`: Synthesize a FSK sequence of alternating 1s and 0s. With a FM receiver, it sounds like a constant audio tone at `toneHz`.
+* `CWBeep(int8_t powerdBm, uint32_t lengthMs)`: Generate a continuous wave tone. E.g. for morse code
+
+Note that the `powerdBm` value can range from -9 to 22 dBm. `HAL_Delay(uint32_t millis)` can be used as delay.
+
+Additionally, `play_morse_word(uint8_t* letters, uint8_t len, bool use_cw)` can be used to send an array of letters as morse (either FM or CW).
+
 
 Programming the firmware can be done with [STM32CubeProg](https://www.st.com/en/development-tools/stm32cubeprog.html) and a cheap UART to USB dongle (If you don't have one, search "FTDI adaptor" and get one of the red dongles with 6 pins)
 
