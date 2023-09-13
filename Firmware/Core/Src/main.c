@@ -212,7 +212,7 @@ void LED_off() {
 }
 
 // https://en.wikipedia.org/wiki/Morse_code#/media/File:International_Morse_Code.svg
-uint32_t morse_unit_ms = 100;
+uint32_t morse_unit_ms = 70;
 int8_t morse_power = 10;
 
 void play_morse_char(uint8_t ascii_letter, bool use_cw) {
@@ -240,13 +240,14 @@ void play_morse_char(uint8_t ascii_letter, bool use_cw) {
     }
 
     for (uint8_t i = 7; i > terminatelen; i--) {
+    	LED_on();
         if (morse_code & (1 << i)) {
             // make dat
             //printf("-");
             if (use_cw) {
                 CWBeep(morse_power, morse_unit_ms * 3);
             } else {
-                FSKBeep(morse_power, 750, morse_unit_ms * 3);
+                FSKBeep(morse_power, 400, morse_unit_ms * 3);
             }
         } else {
             // make dit
@@ -254,9 +255,10 @@ void play_morse_char(uint8_t ascii_letter, bool use_cw) {
             if (use_cw) {
                 CWBeep(morse_power, morse_unit_ms);
             } else {
-                FSKBeep(morse_power, 750, morse_unit_ms);
+                FSKBeep(morse_power, 400, morse_unit_ms);
             }
         }
+        LED_off();
 
         // Make delay.
         if (use_cw) {
@@ -319,7 +321,9 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   //EE_Status ee_status = EE_OK;
-  HAL_Delay(6000); // initial start
+  LED_on();
+  HAL_Delay(50); // initial start
+  LED_off();
   SetStandbyXOSC();
   HAL_Delay(1);
   SetPacketTypeLora();
@@ -335,13 +339,49 @@ int main(void)
 
   SetModulationParamsFSK(2000,    0x09,     0x1E,      2500);
 
+  // Change stuff starting here
+
   // Frequency setting in MHz
-  double center_freq = PMR446[13-1] ;//434.700;
+  double center_freq = 434.030;
   //double center_freq = 223.010;
   double freq_correction = 0.99999539941; // Try trimming caps
 
   SetRfFreq(ComputeRfFreq(center_freq * freq_correction));
 
+  bool CallsignTF = false;
+  uint8_t callsign[] = "nocall";
+
+  int CallsignPeriod = 300; // seconds
+
+  bool CWbeep = false;
+  int CWbeepcount = 4;
+  bool CWHigh2Low = true; //if true, start with highest power beep, decrease from there
+  int CWbeepOffset = 150; //Hertz
+  int CWbeepIndLength = 20; //milliseconds
+  int CWbeepGapLength = 20; //milliseconds
+
+
+  bool FSKbeep = true;
+  int FSKbeepcount = 4;
+  bool FSKHigh2Low = false; //if true, start with highest power beep, decrease from there. When true, it maximizes the power of the highest power beep, but makes it harder to read a visible signal indicator on later beeps.
+  int FSKbeepIndLength = 150; //milliseconds
+  int FSKbeepGapLength = 50; //milliseconds
+  bool CustomFSKtones = false;
+
+  int FSKtones[FSKbeepcount];
+  memset(FSKtones, 0, sizeof(FSKtones));
+  for(int i=0; i<FSKbeepcount; i++){
+  	  int base = floor(i/3);
+  	  int mplr = 1<<base;
+  	  FSKtones[i] = 320*(1 + 0.25*(i-3*floor(i/3)))*mplr;
+  }
+  if (CustomFSKtones){
+	  int FSKtones = {320, 400, 480, 640}; // Must match the length exactly!
+  }
+//  int FSKtones[12] = {400, 350, 300, 250, 200, 150, 1600, 2000, 2400, 3200, 4000, 4800};
+  int Period = 2000; //milliseconds
+
+  //stop changing stuff
 
   /* USER CODE END 2 */
 
@@ -357,28 +397,139 @@ int main(void)
       HAL_Delay(1000);
   }*/
 
+  int loopCounter = floor(CallsignPeriod * 1000 / Period);
+
+  int gap = Period;
+  if(FSKbeep) {
+	  gap = gap-(FSKbeepIndLength * FSKbeepcount);
+	  gap = gap-(FSKbeepGapLength * (FSKbeepcount-1));
+  }
+  if(CWbeep) {
+	  gap = gap-(CWbeepIndLength * CWbeepcount);
+	  gap = gap-(CWbeepGapLength * (CWbeepcount - 1));
+  }
+  if (CWbeep && FSKbeep) {
+	  gap = gap /2;
+  }
+
+  int FSKTXpwrs[FSKbeepcount];
+  memset(FSKTXpwrs, 0, sizeof(FSKTXpwrs));
+  if(FSKbeep){
+	  int stepsize = 0;
+	  if (FSKbeepcount > 1){
+		  stepsize = 31/(FSKbeepcount - 1);
+	  }
+	  for(int i=0; i<FSKbeepcount; i++){
+		 FSKTXpwrs[i] = 22 - stepsize * i;
+	  }
+  }
+  int CWTXpwrs[CWbeepcount];
+  memset(CWTXpwrs, 0, sizeof(CWTXpwrs));
+  if(CWbeep){
+	  int stepsize = 0;
+	  if (CWbeepcount > 1){
+		  stepsize = 31/(CWbeepcount - 1);
+	  }
+	  for(int i=0; i<CWbeepcount; i++){
+		 CWTXpwrs[i] = 22 - stepsize * i;
+	  }
+  }
+
   while (1)
   {
-      LED_on();
-      FSKBeep(-9, 500, 200);
-
-      HAL_Delay(50);
-
-      FSKBeep(2, 750, 200);
-
-      HAL_Delay(50);
-
-      FSKBeep(14, 1000, 200);
-      HAL_Delay(50);
-
-      //HAL_Delay(1000);
-      //uint8_t callsign[] = "HI";
-      //play_morse_word(callsign, sizeof(callsign)-1, false);
-
+	  if(CallsignTF)
+	  {
+		  play_morse_word(callsign, sizeof(callsign)-1, false);
+	  }
 
       LED_off();
 
-      HAL_Delay(4000);
+      HAL_Delay(gap);
+      for (int i=0; i<loopCounter-1; i++)
+      {
+    	  SetRfFreq(ComputeRfFreq(center_freq * freq_correction));
+    	  // FSK beeps
+    	  if(FSKbeep){
+    		  if(FSKHigh2Low){
+    			  for (int j=0; j<FSKbeepcount; j++){
+    				  LED_on();
+    				  FSKBeep(FSKTXpwrs[j], FSKtones[j], FSKbeepIndLength);
+    				  LED_off();
+    				  HAL_Delay(FSKbeepGapLength);
+    			  }
+    		  }
+    		  else {
+    			  for (int j=0; j<FSKbeepcount; j++){
+    				  LED_on();
+    				  FSKBeep(FSKTXpwrs[FSKbeepcount-1-j], FSKtones[j], FSKbeepIndLength);
+    				  LED_off();
+    				  HAL_Delay(FSKbeepGapLength);
+    			  }
+    		  }
+    		  HAL_Delay(gap);
+    	  }
+    	  if(CWbeep){
+    		  if(CWHigh2Low){
+    			  for (int j=0; j<CWbeepcount; j++){
+    				  LED_on();
+    				  SetRfFreq(ComputeRfFreq((center_freq + 0.000001*CWbeepOffset*j) * freq_correction));
+    				  CWBeep(CWTXpwrs[j], CWbeepIndLength);
+    				  LED_off();
+    				  HAL_Delay(CWbeepGapLength);
+    			  }
+    		  }
+    		  else{
+    			  for (int j=0; j<CWbeepcount; j++){
+    				  LED_on();
+    				  SetRfFreq(ComputeRfFreq((center_freq + 0.000001*CWbeepOffset*j) * freq_correction));
+    				  CWBeep(CWTXpwrs[CWbeepcount-1-j], CWbeepIndLength);
+    				  LED_off();
+    				  HAL_Delay(CWbeepGapLength);
+    			  }
+    		  }
+    		  HAL_Delay(gap);
+    	  }
+    	  // CW beeps
+/*    	  LED_on();
+          FSKBeep(-9, 400, 150);
+          LED_off();
+
+          HAL_Delay(100);
+
+          LED_on();
+          FSKBeep(7, 500, 150);
+          LED_off();
+
+          HAL_Delay(100);
+
+          LED_on();
+          FSKBeep(22, 600, 200);
+          LED_off();
+
+          HAL_Delay(1000);
+
+          LED_on();
+          CWBeep(22, 25);
+          LED_off();
+          HAL_Delay(25);
+          SetRfFreq(ComputeRfFreq((center_freq + 0.0002) * freq_correction));
+          LED_on();
+          CWBeep(11, 25);
+          LED_off();
+          HAL_Delay(25);
+          SetRfFreq(ComputeRfFreq((center_freq + 0.0004) * freq_correction));
+          LED_on();
+          CWBeep(1, 25);
+          LED_off();
+          HAL_Delay(25);
+          SetRfFreq(ComputeRfFreq((center_freq + 0.0006) * freq_correction));
+          LED_on();
+          CWBeep(-9, 25);
+          LED_off();
+
+          HAL_Delay(2000);
+*/
+      }
 
     /* USER CODE END WHILE */
 
