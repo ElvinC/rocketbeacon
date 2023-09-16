@@ -322,42 +322,27 @@ int main(void)
   MX_CRC_Init();
   /* USER CODE BEGIN 2 */
 
-  //EE_Status ee_status = EE_OK;
-  LED_on();
-  HAL_Delay(5000); // initial start. A few seconds to allow coin cell batteries to recover in case of brownout resets.
-  LED_off();
-  SetStandbyXOSC();
-  HAL_Delay(1);
-  SetPacketTypeLora();
-  HAL_Delay(1);
-
-  //SetPaLowPower(); // For powers up to 14 dBm
-  SetPa22dB(); // Uncomment for powers up to 22 dBm
-  HAL_Delay(1);
-  SetTxPower(-9);
-  HAL_Delay(1);
-
-  SetPacketTypeFSK();
-
-  SetModulationParamsFSK(2000,    0x09,     0x1E,      2500);
-
   // ==========================================
   //      START CHANGING SETTINGS HERE
   // ==========================================
 
   // Frequency setting in MHz
+  // Can be a "standard" frequency, e.g. center_freq = LPD433[20-1]; sets it to LPD433 channel 20 (zero indexed) = 433.550 MHz
   double center_freq = 434.100;
-  //double center_freq = 223.010;
-  int maxPower = 22; // max power in dBm, valid values between -9 and 22; If using coin cell batteries, values values above 16 dBm are not recommended.
 
-  double freq_correction = 0.99999539941; // Try trimming caps
-  SetRfFreq(ComputeRfFreq(center_freq * freq_correction));
+  // max power in dBm, valid values between -9 and 22;
+  // If using coin cell batteries, values above 16 dBm are not recommended without testing due to current limitations.
+  // Alternatively use external LiPo power
+  int maxPower = 16;
+
+  double freq_correction = 0.99999539941; // For tuning frequency
 
   bool CallsignTF = false;
   uint8_t callsign[] = "nocall";
 
   int CallsignPeriod = 300; // seconds
 
+  // Continuous Wave (CW) settings
   bool CWbeep = false;
   int CWbeepcount = 4;
   bool CWHigh2Low = true; //if true, start with highest power beep, decrease from there
@@ -366,22 +351,46 @@ int main(void)
   int CWbeepGapLength = 20; //milliseconds
 
 
+  // Frequency-shift keying (FSK) settings. Can be heard with FM receivers
   bool FSKbeep = true;
   int FSKbeepcount = 4;
   bool FSKHigh2Low = false; //if true, start with highest power beep, decrease from there. When true, it maximizes the power of the highest power beep, but makes it harder to read a visible signal indicator on later beeps.
-  int FSKbeepIndLength = 220; //milliseconds
+  int FSKbeepIndLength = 150; //milliseconds
   int FSKbeepGapLength = 50; //milliseconds
   bool CustomFSKtones = false;
   int CustomFSKfrequencies[] = {320, 400, 480, 640}; // Must match the length exactly!
 
-  int FSKtones[FSKbeepcount];
-  int Period = 4000; //milliseconds
+  int Period = 2000; //milliseconds
+  int StartupWait = 5000; // initial start. A few seconds to allow coin cell batteries to recover in case of brownout resets.
 
   // ==========================================
   //      STOP CHANGING SETTINGS HERE
   // ==========================================
 
+
+  //EE_Status ee_status = EE_OK;
+  LED_on();
+  HAL_Delay(StartupWait);
+  LED_off();
+  SetStandbyXOSC();
+  HAL_Delay(1);
+  SetPacketTypeLora();
+  HAL_Delay(1);
+
+  //SetPaLowPower(); // For powers up to 14 dBm
+  SetPa22dB(); // Allows powers up to 22 dBm
+  HAL_Delay(1);
+  SetTxPower(-9);
+  HAL_Delay(1);
+
+  SetPacketTypeFSK();
+
+  SetModulationParamsFSK(2000,    0x09,     0x1E,      2500);
+
+
   //  int FSKtones[12] = {400, 350, 300, 250, 200, 150, 1600, 2000, 2400, 3200, 4000, 4800};
+  int FSKtones[FSKbeepcount];
+  SetRfFreq(ComputeRfFreq(center_freq * freq_correction));
 
   memset(FSKtones, 0, sizeof(FSKtones));
   for(int i=0; i<FSKbeepcount; i++){
@@ -822,7 +831,8 @@ void SetPa22dB() {
 
 void SetTxPower(int8_t powerdBm) {
     // Between -9 and 22
-    uint8_t txbuf[3] = {0x8E, (uint8_t) powerdBm, 0x02};
+    int8_t power = powerdBm < -9 ? -9 : ((powerdBm > 22) ? 22 : powerdBm);
+    uint8_t txbuf[3] = {0x8E, (uint8_t) power, 0x02};
     HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
 }
 
