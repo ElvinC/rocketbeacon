@@ -22,6 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdbool.h>
+#include <string.h>
 #include <math.h>
 /* USER CODE END Includes */
 
@@ -323,7 +324,7 @@ int main(void)
 
   //EE_Status ee_status = EE_OK;
   LED_on();
-  HAL_Delay(50); // initial start
+  HAL_Delay(5000); // initial start. A few seconds to allow coin cell batteries to recover in case of brownout resets.
   LED_off();
   SetStandbyXOSC();
   HAL_Delay(1);
@@ -340,13 +341,16 @@ int main(void)
 
   SetModulationParamsFSK(2000,    0x09,     0x1E,      2500);
 
-  // Change stuff starting here
+  // ==========================================
+  //      START CHANGING SETTINGS HERE
+  // ==========================================
 
   // Frequency setting in MHz
-  double center_freq = 434.030;
+  double center_freq = 434.100;
   //double center_freq = 223.010;
-  double freq_correction = 0.99999539941; // Try trimming caps
+  int maxPower = 16; // max power in dBm, valid values between -9 and 22; If using coin cell batteries, values values above 16 dBm are not recommended.
 
+  double freq_correction = 0.99999539941; // Try trimming caps
   SetRfFreq(ComputeRfFreq(center_freq * freq_correction));
 
   bool CallsignTF = false;
@@ -365,9 +369,10 @@ int main(void)
   bool FSKbeep = true;
   int FSKbeepcount = 4;
   bool FSKHigh2Low = false; //if true, start with highest power beep, decrease from there. When true, it maximizes the power of the highest power beep, but makes it harder to read a visible signal indicator on later beeps.
-  int FSKbeepIndLength = 150; //milliseconds
+  int FSKbeepIndLength = 220; //milliseconds
   int FSKbeepGapLength = 50; //milliseconds
   bool CustomFSKtones = false;
+  int CustomFSKfrequencies[] = {320, 400, 480, 640}; // Must match the length exactly!
 
   int FSKtones[FSKbeepcount];
   memset(FSKtones, 0, sizeof(FSKtones));
@@ -377,12 +382,15 @@ int main(void)
   	  FSKtones[i] = 320*(1 + 0.25*(i-3*floor(i/3)))*mplr;
   }
   if (CustomFSKtones){
-	  int FSKtones = {320, 400, 480, 640}; // Must match the length exactly!
+	  memcpy(FSKtones, CustomFSKfrequencies, sizeof(FSKtones));
   }
-//  int FSKtones[12] = {400, 350, 300, 250, 200, 150, 1600, 2000, 2400, 3200, 4000, 4800};
-  int Period = 2000; //milliseconds
+  //  int FSKtones[12] = {400, 350, 300, 250, 200, 150, 1600, 2000, 2400, 3200, 4000, 4800};
+  int Period = 4000; //milliseconds
 
-  //stop changing stuff
+  // ==========================================
+  //      STOP CHANGING SETTINGS HERE
+  // ==========================================
+
 
   /* USER CODE END 2 */
 
@@ -418,10 +426,10 @@ int main(void)
   if(FSKbeep){
 	  int stepsize = 0;
 	  if (FSKbeepcount > 1){
-		  stepsize = 31/(FSKbeepcount - 1);
+		  stepsize = (31 - 22 + maxPower)/(FSKbeepcount - 1);
 	  }
 	  for(int i=0; i<FSKbeepcount; i++){
-		 FSKTXpwrs[i] = 22 - stepsize * i;
+		 FSKTXpwrs[i] = maxPower - stepsize * i;
 	  }
   }
   int CWTXpwrs[CWbeepcount];
@@ -429,10 +437,10 @@ int main(void)
   if(CWbeep){
 	  int stepsize = 0;
 	  if (CWbeepcount > 1){
-		  stepsize = 31/(CWbeepcount - 1);
+		  stepsize = (31 - 22 + maxPower)/(CWbeepcount - 1);
 	  }
 	  for(int i=0; i<CWbeepcount; i++){
-		 CWTXpwrs[i] = 22 - stepsize * i;
+		 CWTXpwrs[i] = maxPower - stepsize * i;
 	  }
   }
 
