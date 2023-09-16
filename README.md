@@ -13,8 +13,17 @@ The hardware features:
 * CR2032 battery holder
 * Can be powered externally by 3.3-5V
 
+## Battery selection and life
+**Warning: the beacon doesn't have reverse polarity protection, always double check the battery polarity!** If powered by an external battery (e.g. 1s lipo), connect to the V+ and GND pins. 
+
+CR2032 batteries can't supply much current. When using CR2032 batteries, transmit powers above 16 dBm are not recommended without proper testing. When the voltage drops below 1.8V, the module restarts. An initial delay of a few seconds is thus recommended to allow CR2032 batteries to "recover" after a reset.
+
+To give an idea of the battery life: 3x200 ms beeps at -9, 2, 14 dBm at 4 second intervals achieved 20 hours of battery life with the CR2032. 
+
+Using LiPo batteries, transmit powers up to 22 dBm can be used without issues.
+
 ## Assembly
-The assembled PCB can be ordered by uploading the files from `hardware/beacon/jlcpcb` to JLCPCB. `GERBER-beacon.zip` contains the PCB files, `CPL-beacon.csv` is the placement file and `BOM-beacon-v1.0-440MHz.csv` or `BOM-beacon-v1.0-440MHz.csv` are the BOMs for each frequency version (pick one). Use the following settings when ordering:
+The assembled PCB can be ordered by uploading the files from `hardware\beacon\jlcpcb` to JLCPCB. `GERBER-beacon.zip` contains the PCB files, `CPL-beacon.csv` is the placement file and `BOM-beacon-v1.0-440MHz.csv` or `BOM-beacon-v1.0-440MHz.csv` are the BOMs for each frequency version (pick one). Use the following settings when ordering:
 
 * Layers=2
 * Thickness=1.6
@@ -32,7 +41,7 @@ Other than the assembled PCB, an antenna is required. For a basic quarter wave c
 
 If powered by a button cell battery, solder on a [MY-2032-12](https://www.lcsc.com/product-detail/Battery-Connectors_MYOUNG-MY-2032-12_C964833.html) battery connector. Other similar CR2032 holders work as well, but may require trimming the solder leads to fit the footprint. Melt a little solder on the negative battery terminal before soldering on the battery holder to ensure proper electrical contact.
 
-If powered by an external battery (e.g. 1s lipo), connect to the V+ and GND pins. **Note that it doesn't have reverse polarity protection, so double check the polarity!**
+
 
 
 ## Compile and program

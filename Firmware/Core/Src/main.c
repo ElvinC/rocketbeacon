@@ -348,7 +348,7 @@ int main(void)
   // Frequency setting in MHz
   double center_freq = 434.100;
   //double center_freq = 223.010;
-  int maxPower = 16; // max power in dBm, valid values between -9 and 22; If using coin cell batteries, values values above 16 dBm are not recommended.
+  int maxPower = 22; // max power in dBm, valid values between -9 and 22; If using coin cell batteries, values values above 16 dBm are not recommended.
 
   double freq_correction = 0.99999539941; // Try trimming caps
   SetRfFreq(ComputeRfFreq(center_freq * freq_correction));
@@ -375,22 +375,23 @@ int main(void)
   int CustomFSKfrequencies[] = {320, 400, 480, 640}; // Must match the length exactly!
 
   int FSKtones[FSKbeepcount];
-  memset(FSKtones, 0, sizeof(FSKtones));
-  for(int i=0; i<FSKbeepcount; i++){
-  	  int base = floor(i/3);
-  	  int mplr = 1<<base;
-  	  FSKtones[i] = 320*(1 + 0.25*(i-3*floor(i/3)))*mplr;
-  }
-  if (CustomFSKtones){
-	  memcpy(FSKtones, CustomFSKfrequencies, sizeof(FSKtones));
-  }
-  //  int FSKtones[12] = {400, 350, 300, 250, 200, 150, 1600, 2000, 2400, 3200, 4000, 4800};
   int Period = 4000; //milliseconds
 
   // ==========================================
   //      STOP CHANGING SETTINGS HERE
   // ==========================================
 
+  //  int FSKtones[12] = {400, 350, 300, 250, 200, 150, 1600, 2000, 2400, 3200, 4000, 4800};
+
+  memset(FSKtones, 0, sizeof(FSKtones));
+  for(int i=0; i<FSKbeepcount; i++){
+      int base = floor(i/3);
+      int mplr = 1<<base;
+      FSKtones[i] = 320*(1 + 0.25*(i-3*floor(i/3)))*mplr;
+  }
+  if (CustomFSKtones){
+      memcpy(FSKtones, CustomFSKfrequencies, sizeof(FSKtones));
+  }
 
   /* USER CODE END 2 */
 
