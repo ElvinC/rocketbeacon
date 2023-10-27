@@ -1,10 +1,10 @@
-# rocketbeacon (Work in progress)
+# rocketbeacon
 Configurable sub-GHz radio beacon for amateur rocketry.
 
 **Warning: make sure to comply with your local RF regulations. Some frequency bands require an amateur radio license, others have power or duty cycle limitations.**
 
 ## Hardware
-The hardware is designed in KiCad for assembly with JLCPCB. Two versions of the RF front end are available, one optimized for the 220 MHz band and one for the 440 MHz band. Note that the 220 version is still untested.
+The hardware is designed in KiCad for assembly with JLCPCB. Two versions of the RF front end are available, one optimized for the 220 MHz band and one for the 440 MHz band.
 
 The hardware features:
 
