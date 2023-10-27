@@ -23,7 +23,7 @@ To give an idea of the battery life: 3x200 ms beeps at -9, 2, 14 dBm at 4 second
 Using LiPo batteries, transmit powers up to 22 dBm can be used without issues.
 
 ## Assembly
-The assembled PCB can be ordered by uploading the files from `hardware\beacon\jlcpcb` to JLCPCB. `GERBER-beacon.zip` contains the PCB files, `CPL-beacon.csv` is the placement file and `BOM-beacon-v1.0-440MHz.csv` or `BOM-beacon-v1.0-440MHz.csv` are the BOMs for each frequency version (pick one). Use the following settings when ordering:
+The assembled PCB can be ordered by uploading the files from `hardware\beacon\jlcpcb` to JLCPCB. These files are also available in releases as a zip file. `GERBER-beacon.zip` contains the PCB files. For the pick-and-place centroid file, pick either `CPL-beacon-no-pinheader.csv` (cheaper and more compact) or `CPL-beacon-with-pinheader.csv` (assembled with pinheader). `BOM-beacon-v1.0-440MHz.csv` or `BOM-beacon-v1.0-440MHz.csv` are the BOMs for each frequency version (pick one). Make sure visually that all components (except the 220/440 indicator resistor) are populated. Use the following settings when ordering:
 
 * Layers=2
 * Thickness=1.6
