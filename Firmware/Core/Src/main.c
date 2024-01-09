@@ -286,6 +286,155 @@ void play_morse_word(uint8_t* letters, uint8_t len, bool use_cw) {
     }
 }
 
+double center_freq;
+double freq_correction = 0.99999539941; // For tuning frequency
+
+// Weird audio stuff
+
+#define AUDIOSYNTH
+
+#ifdef AUDIOSYNTH
+#include "audio_samples.h"
+double audio_deviation = 0.0025; // 2.5 KHz for 12.5 khz channel spacing
+int audio_number_interval_ms = 100;
+
+uint32_t freq_mapping[256];
+
+
+void delay_cycles(uint32_t cycles) {
+    //34 s for 100*30000 cycles
+    //about 11 us per cycle
+    // We want 125 - 40 us
+    // Or about 125 - 40
+    // Try 8 cycles
+    for (int i = 0; i < cycles; i++) {
+        asm("NOP");
+    }
+}
+
+
+void synth_numbers(uint8_t* letters, uint8_t len) {
+    // Start transmission
+    SetPacketTypeLora();
+    HAL_Delay(10);
+    SetTxPower(-9);
+    HAL_Delay(10);
+    SetContinuousWave();
+    HAL_Delay(10);
+
+    /*
+    uint32_t low = ComputeRfFreq(center_freq);
+    uint32_t high = ComputeRfFreq(center_freq + audio_deviation);
+    uint32_t rfFreq = low;
+
+    for (uint32_t idx = 0; idx < 1000; idx++) {
+        rfFreq = rfFreq == low ? high : low;
+
+        SetRfFreq(rfFreq);
+        //(void)SUBGHZ_WaitOnBusy(hsubghz);
+        delay_cycles(1);
+        SetRfFreq(rfFreq);
+        //(void)SUBGHZ_WaitOnBusy(hsubghz);
+        delay_cycles(1);
+        //SetRfFreq(rfFreq);
+    }
+
+
+    return;
+    */
+
+    for (uint32_t idx = 0; idx < len; idx++) {
+        uint8_t *audio_sample_data;
+        uint32_t num_audio_samples = 0;
+
+        switch (letters[idx]) {
+        case '0':
+            audio_sample_data = audio_zero;
+            num_audio_samples = sizeof(audio_zero);
+            break;
+        case '1':
+            audio_sample_data = audio_one;
+            num_audio_samples = sizeof(audio_one);
+            break;
+        case '2':
+            audio_sample_data = audio_two;
+            num_audio_samples = sizeof(audio_two);
+            break;
+        case '3':
+            audio_sample_data = audio_three;
+            num_audio_samples = sizeof(audio_three);
+            break;
+        case '4':
+            audio_sample_data = audio_four;
+            num_audio_samples = sizeof(audio_four);
+            break;
+        case '5':
+            audio_sample_data = audio_five;
+            num_audio_samples = sizeof(audio_five);
+            break;
+        case '6':
+            audio_sample_data = audio_six;
+            num_audio_samples = sizeof(audio_six);
+            break;
+        case '7':
+            audio_sample_data = audio_seven;
+            num_audio_samples = sizeof(audio_seven);
+            break;
+        case '8':
+            audio_sample_data = audio_eight;
+            num_audio_samples = sizeof(audio_eight);
+            break;
+        case '9':
+            audio_sample_data = audio_nine;
+            num_audio_samples = sizeof(audio_nine);
+            break;
+        case '.':
+            audio_sample_data = audio_point;
+            num_audio_samples = sizeof(audio_point);
+            break;
+        case '-':
+            audio_sample_data = audio_minus;
+            num_audio_samples = sizeof(audio_minus);
+            break;
+        default:
+            break;
+        }
+
+        for (uint32_t sample_num = 0; sample_num < num_audio_samples; sample_num++) {
+            //SetRfFreq(freq_mapping[audio_zero[sample_num]]);
+
+            // Default not fast enough
+            //SetRfFreq(freq_mapping[audio_sample_data[sample_num]]);
+            uint32_t rfFreq = freq_mapping[audio_sample_data[sample_num]];
+            uint8_t txbuf[5] = {0x86, (rfFreq & 0xFF000000) >> 24, (rfFreq & 0x00FF0000) >> 16, (rfFreq & 0x0000FF00) >> 8, rfFreq & 0x000000FF};
+
+            /* NSS = 0 */
+            LL_PWR_SelectSUBGHZSPI_NSS();
+
+            for (uint16_t i = 0U; i < 5; i++)
+            {
+              (void)SUBGHZSPI_Transmit(&hsubghz, txbuf[i]);
+            }
+
+            /* NSS = 1 */
+            LL_PWR_UnselectSUBGHZSPI_NSS();
+
+
+            delay_cycles(100); // Trial and error.
+        }
+
+        HAL_Delay(audio_number_interval_ms);
+    }
+
+    // Set back to default freq
+    SetRfFreq(ComputeRfFreq(center_freq * freq_correction));
+    HAL_Delay(10);
+    SetStandbyXOSC();
+}
+
+#endif
+
+
 /* USER CODE END 0 */
 
 /**
@@ -328,14 +477,15 @@ int main(void)
 
   // Frequency setting in MHz
   // Can be a "standard" frequency, e.g. center_freq = LPD433[20-1]; sets it to LPD433 channel 20 (zero indexed) = 433.550 MHz
-  double center_freq = 434.100;
+  //center_freq = LPD433[6-1];
+  center_freq = 446.150;
 
   // max power in dBm, valid values between -9 and 22;
   // If using coin cell batteries, values above 16 dBm are not recommended without testing due to current limitations.
   // Alternatively use external LiPo power
-  int maxPower = 16;
+  int maxPower = 14;
 
-  double freq_correction = 0.99999539941; // For tuning frequency
+  freq_correction = 0.99999539941; // For tuning frequency
 
   bool CallsignTF = false;
   uint8_t callsign[] = "nocall";
@@ -355,22 +505,21 @@ int main(void)
   bool FSKbeep = true;
   int FSKbeepcount = 4;
   bool FSKHigh2Low = false; //if true, start with highest power beep, decrease from there. When true, it maximizes the power of the highest power beep, but makes it harder to read a visible signal indicator on later beeps.
-  int FSKbeepIndLength = 150; //milliseconds
+  int FSKbeepIndLength = 240; //milliseconds
   int FSKbeepGapLength = 50; //milliseconds
   bool CustomFSKtones = false;
   int CustomFSKfrequencies[] = {320, 400, 480, 640}; // Must match the length exactly!
 
-  int Period = 2000; //milliseconds
-  int StartupWait = 5000; // initial start. A few seconds to allow coin cell batteries to recover in case of brownout resets.
+  int Period = 4000; //milliseconds
+  int StartupWait = 6000; // initial start. A few seconds to allow coin cell batteries to recover in case of brownout resets.
 
   // ==========================================
   //      STOP CHANGING SETTINGS HERE
   // ==========================================
 
-
   //EE_Status ee_status = EE_OK;
   LED_on();
-  HAL_Delay(StartupWait);
+  //HAL_Delay(StartupWait);
   LED_off();
   SetStandbyXOSC();
   HAL_Delay(1);
@@ -407,7 +556,27 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
-  /*
+
+    #ifdef AUDIOSYNTH
+
+    for (uint16_t i = 0; i < 256; i++) {
+      freq_mapping[i] = ComputeRfFreq(center_freq*freq_correction + audio_deviation * ((double) i / 255.0L  - 0.5L));
+    }
+
+
+    uint8_t number_test[] = "-0.123456789";
+
+    while (1) {
+        LED_on();
+
+        synth_numbers(number_test, sizeof(number_test)-1);
+
+        LED_off();
+        HAL_Delay(4000);
+    }
+    #endif
+
+    /*
   while (1) {
       // Emulate comspec beacon at 40 mW
       LED_on();
@@ -587,10 +756,10 @@ void SystemClock_Config(void)
                               |RCC_CLOCKTYPE_SYSCLK|RCC_CLOCKTYPE_PCLK1
                               |RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSE;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV16;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
-  RCC_ClkInitStruct.AHBCLK3Divider = RCC_SYSCLK_DIV16;
+  RCC_ClkInitStruct.AHBCLK3Divider = RCC_SYSCLK_DIV1;
 
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
   {
@@ -621,7 +790,7 @@ static void MX_ADC_Init(void)
   /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
   */
   hadc.Instance = ADC;
-  hadc.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
+  hadc.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV1;
   hadc.Init.Resolution = ADC_RESOLUTION_12B;
   hadc.Init.DataAlign = ADC_DATAALIGN_RIGHT;
   hadc.Init.ScanConvMode = ADC_SCAN_DISABLE;
@@ -695,7 +864,7 @@ static void MX_SUBGHZ_Init(void)
   /* USER CODE BEGIN SUBGHZ_Init 1 */
 
   /* USER CODE END SUBGHZ_Init 1 */
-  hsubghz.Init.BaudratePrescaler = SUBGHZSPI_BAUDRATEPRESCALER_8;
+  hsubghz.Init.BaudratePrescaler = SUBGHZSPI_BAUDRATEPRESCALER_2;
   if (HAL_SUBGHZ_Init(&hsubghz) != HAL_OK)
   {
     Error_Handler();

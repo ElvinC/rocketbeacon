@@ -452,7 +452,7 @@
       "idf": "",
       "netlist": "",
       "specctra_dsn": "",
-      "step": "",
+      "step": "beacon.step",
       "vrml": ""
     },
     "page_layout_descr_file": ""
