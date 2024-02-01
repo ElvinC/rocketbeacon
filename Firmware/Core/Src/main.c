@@ -286,6 +286,56 @@ void play_morse_word(uint8_t* letters, uint8_t len, bool use_cw) {
     }
 }
 
+
+void rx_test(bool is_tx) {
+  LED_on();
+  HAL_Delay(100);
+  LED_off();
+  SetStandbyXOSC();
+  HAL_Delay(1);
+  SetPacketTypeLora();
+  HAL_Delay(1);
+  SetRfFreq(ComputeRfFreq(433.250));
+
+  //SetPaLowPower(); // For powers up to 14 dBm
+  SetPa22dB(); // Allows powers up to 22 dBm
+  HAL_Delay(1);
+  SetTxPower(-9);
+  HAL_Delay(1);
+  uint8_t LORA_SF12_BW62_CR45[4] = {0x0C, 0x03, 0x01, 0x00};
+  SetModulationParamsLora(LORA_SF12_BW62_CR45);
+  HAL_Delay(1);
+
+  SetPacketParamsLora(4, true, 4, true, false); // Send 4 bytes
+  HAL_Delay(1);
+  uint8_t buffer[4] = {0x00, 0x00, 0x00, 0x00};
+  HAL_SUBGHZ_WriteBuffer(&hsubghz, 0, buffer, 4);
+
+
+  while (1) {
+      if (is_tx) {
+          buffer[0] = 0x04; // Led ON
+          HAL_SUBGHZ_WriteBuffer(&hsubghz, 0, buffer, 4);
+          HAL_Delay(1);
+          SetTx(0);
+          LED_on();
+          HAL_Delay(1000);
+
+      } else {
+          SetRx(0);
+          HAL_Delay(100);
+          HAL_SUBGHZ_ReadBuffer(&hsubghz, 0, buffer, 4);
+          if (buffer[0] == 0x04) {
+              LED_on();
+
+          } else {
+              LED_off();
+          }
+      }
+  }
+
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -328,12 +378,13 @@ int main(void)
 
   // Frequency setting in MHz
   // Can be a "standard" frequency, e.g. center_freq = LPD433[20-1]; sets it to LPD433 channel 20 (zero indexed) = 433.550 MHz
-  double center_freq = 434.100;
+  rx_test(true);
+  double center_freq = 433.225;
 
   // max power in dBm, valid values between -9 and 22;
   // If using coin cell batteries, values above 16 dBm are not recommended without testing due to current limitations.
   // Alternatively use external LiPo power
-  int maxPower = 16;
+  int maxPower = 10;
 
   double freq_correction = 0.99999539941; // For tuning frequency
 
@@ -353,9 +404,9 @@ int main(void)
 
   // Frequency-shift keying (FSK) settings. Can be heard with FM receivers
   bool FSKbeep = true;
-  int FSKbeepcount = 4;
+  int FSKbeepcount = 3;
   bool FSKHigh2Low = false; //if true, start with highest power beep, decrease from there. When true, it maximizes the power of the highest power beep, but makes it harder to read a visible signal indicator on later beeps.
-  int FSKbeepIndLength = 150; //milliseconds
+  int FSKbeepIndLength = 250; //milliseconds
   int FSKbeepGapLength = 50; //milliseconds
   bool CustomFSKtones = false;
   int CustomFSKfrequencies[] = {320, 400, 480, 640}; // Must match the length exactly!
@@ -878,8 +929,15 @@ void SetPacketParamsLora(uint16_t preamble_length, bool header_fixed, uint8_t pa
 
     HAL_SUBGHZ_ExecSetCmd(&hsubghz, txbuf[0], txbuf+1, sizeof(txbuf)-1);
 }
+/*
+void WriteBuffer(uint8_t offset, uint8_t *data, uint8_t len) {
+    HAL_SUBGHZ_WriteBuffer(&hsubghz, offset, data, len);
+}
 
-
+void ReadBuffer(uint8_t offset, uint8_t *data, uint8_t len) {
+    HAL_SUBGHZ_ReadBuffer(&hsubghz, offset, data, len);
+}
+*/
 void FSKBeep(int8_t powerdBm, uint32_t toneHz, uint32_t lengthMs) {
     // assume in standbyXOSC already.
     HAL_Delay(1);
