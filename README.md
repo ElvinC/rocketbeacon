@@ -3,6 +3,8 @@ Configurable sub-GHz radio beacon for amateur rocketry.
 
 **Warning: make sure to comply with your local RF regulations. Some frequency bands require an amateur radio license, others have power or duty cycle limitations.**
 
+
+
 ## Hardware
 The hardware is designed in KiCad for assembly with JLCPCB. Two versions of the RF front end are available, one optimized for the 220 MHz band and one for the 440 MHz band.
 
@@ -76,5 +78,6 @@ Programming the firmware can be done with [STM32CubeProg](https://www.st.com/en/
 ## Reception and tuning
 Tune your radio to the programmed frequency. Without calibration, the frequency has a tolerance of roughly +/- 5 KHz in the 70 cm band.
 
-## Configuration
-TODO: Make a little UART configuration interface to set frequency, callsign etc.
+
+## License and usage
+Feel free to use or adapt the hardware design, though if you're a vendor interested in distributing these, please reach out to me at elvin (at) gyroflow.xyz :)

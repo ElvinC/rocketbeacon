@@ -378,7 +378,6 @@ int main(void)
 
   // Frequency setting in MHz
   // Can be a "standard" frequency, e.g. center_freq = LPD433[20-1]; sets it to LPD433 channel 20 (zero indexed) = 433.550 MHz
-  rx_test(true);
   double center_freq = 433.225;
 
   // max power in dBm, valid values between -9 and 22;
