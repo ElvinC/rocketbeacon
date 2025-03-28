@@ -3,9 +3,9 @@ Configurable sub-GHz radio beacon for amateur rocketry.
 
 **Warning: make sure to comply with your local RF regulations. Some frequency bands require an amateur radio license, others have power or duty cycle limitations.**
 
+![programming](Images/render.png)
 
-
-## Hardware
+## Hardware V1.0
 The hardware is designed in KiCad for assembly with JLCPCB. Two versions of the RF front end are available, one optimized for the 220 MHz band and one for the 440 MHz band.
 
 The hardware features:
@@ -24,8 +24,18 @@ To give an idea of the battery life: 3x200 ms beeps at -9, 2, 14 dBm at 4 second
 
 Using LiPo batteries, transmit powers up to 22 dBm can be used without issues.
 
-## Assembly
-The assembled PCB can be ordered by uploading the files from `hardware\beacon\jlcpcb` to JLCPCB. These files are also available in releases as a zip file. `GERBER-beacon.zip` contains the PCB files. For the pick-and-place centroid file, pick either `CPL-beacon-no-pinheader.csv` (cheaper and more compact) or `CPL-beacon-with-pinheader.csv` (assembled with pinheader). `BOM-beacon-v1.0-440MHz.csv` or `BOM-beacon-v1.0-440MHz.csv` are the BOMs for each frequency version (pick one). Make sure visually that all components (except the 220/440 indicator resistor) are populated. If the default STM32WLE5CBU6 is unavailable, the STM32WLE5CCU6 can be selected instead (works with the same firmware).
+## Assembly V1.1
+V1.1 is has some minor tweaks: Larger battery solder pads for improved durability, removal of an unnecessary rx component, and silkscreen tweaks.
+The assembled PCB can be ordered by uploading the files from the 1.1 release to JLCPCB. `BOM-beacon-v1.1-440MHz.csv` or `BOM-beacon-v1.1-440MHz.csv` are the BOMs for each frequency version (pick one). Make sure visually that all components (except the 220/440 indicator resistor) are populated.
+
+![programming](Images/jlc_screenshot.png)
+
+Some BOM parts may be unavailable at the time of ordering, requiring alternative parts to be selected:
+
+* STM32WLE5CBU6 alternatives: STM32WLE5CCU6 (other in the same family should work too without firmware changes)
+* Crystal alternatives: Most 32MHz 10pF 10ppm crystals in the 2016 package should work. E.g. S2132000101080 (though default calibration might be off)
+* Capacitor alternatives: Same values in the same package
+* Inductors: Same values in the same package
 
 Use the following settings when ordering:
 
@@ -37,6 +47,20 @@ Use the following settings when ordering:
 * Assembly side=Top side
 * Tooling holes = Added by Customer
 
+## Assembly V1.0
+The assembled PCB can be ordered by uploading the files from `Hardware\beacon\jlcpcb\production_files\V1.0` to JLCPCB. These files are also available in releases as a zip file. `GERBER-beacon.zip` contains the PCB files. For the pick-and-place centroid file, pick either `CPL-beacon-no-pinheader.csv` (cheaper and more compact) or `CPL-beacon-with-pinheader.csv` (assembled with pinheader). `BOM-beacon-v1.0-440MHz.csv` or `BOM-beacon-v1.0-440MHz.csv` are the BOMs for each frequency version (pick one). Make sure visually that all components (except the 220/440 indicator resistor) are populated. If the default STM32WLE5CBU6 is unavailable, the STM32WLE5CCU6 can be selected instead (works with the same firmware).
+
+Use the following settings when ordering:
+
+* Layers=2
+* Thickness=1.6
+* Vias=Tented
+* Remove order number=Specify a location
+* PCBA type=Economic
+* Assembly side=Top side
+* Tooling holes = Added by Customer
+
+## Soldering
 
 Other than the assembled PCB, an antenna is required. For a basic quarter wave copper antenna, you can use `length = 0.95 * 0.25 * speed of light / frequency`, where 0.95 is the velocity factor of copper. E.g.
 
@@ -44,8 +68,6 @@ Other than the assembled PCB, an antenna is required. For a basic quarter wave c
 * For 220 MHz band, Use 324mm
 
 If powered by a button cell battery, solder on a [MY-2032-12](https://www.lcsc.com/product-detail/Battery-Connectors_MYOUNG-MY-2032-12_C964833.html) battery connector. Other similar CR2032 holders work as well, but may require trimming the solder leads to fit the footprint. Melt a little solder on the negative battery terminal before soldering on the battery holder to ensure proper electrical contact.
-
-
 
 
 ## Compile and program
@@ -60,6 +82,7 @@ Note that the `powerdBm` value can range from -9 to 22 dBm. `HAL_Delay(uint32_t 
 
 Additionally, `play_morse_word(uint8_t* letters, uint8_t len, bool use_cw)` can be used to send an array of letters as morse (either FM or CW).
 
+The default firmware allows for generation of regular FSK or CW tones at various power levels, with options for transmitting callsigns.
 
 Programming the firmware can be done with [STM32CubeProg](https://www.st.com/en/development-tools/stm32cubeprog.html) and a cheap UART to USB dongle (If you don't have one, search "FTDI adaptor" and get one of the red dongles with 6 pins)
 
