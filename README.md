@@ -26,7 +26,7 @@ Using LiPo batteries, transmit powers up to 22 dBm can be used without issues.
 
 ## Assembly V1.1
 V1.1 is has some minor tweaks: Larger battery solder pads for improved durability, removal of an unnecessary rx component, and silkscreen tweaks.
-The assembled PCB can be ordered by uploading the files from the 1.1 release to JLCPCB. `BOM-beacon-v1.1-440MHz.csv` or `BOM-beacon-v1.1-440MHz.csv` are the BOMs for each frequency version (pick one). Make sure visually that all components (except the 220/440 indicator resistor) are populated.
+The assembled PCB can be ordered by uploading the files from the 1.1 release to JLCPCB. `BOM-beacon-v1.1-220MHz.csv` or `BOM-beacon-v1.1-440MHz.csv` are the BOMs for each frequency version (pick one). Make sure visually that all components (except the 220/440 indicator resistor) are populated.
 
 ![programming](Images/jlc_screenshot.png)
 
@@ -42,20 +42,20 @@ Use the following settings when ordering:
 * Layers=2
 * Thickness=1.6
 * Vias=Tented
-* Remove order number=Specify a location
+* Mark on PCB=Order Number(Specify Position)
 * PCBA type=Economic
 * Assembly side=Top side
 * Tooling holes = Added by Customer
 
 ## Assembly V1.0
-The assembled PCB can be ordered by uploading the files from `Hardware\beacon\jlcpcb\production_files\V1.0` to JLCPCB. These files are also available in releases as a zip file. `GERBER-beacon.zip` contains the PCB files. For the pick-and-place centroid file, pick either `CPL-beacon-no-pinheader.csv` (cheaper and more compact) or `CPL-beacon-with-pinheader.csv` (assembled with pinheader). `BOM-beacon-v1.0-440MHz.csv` or `BOM-beacon-v1.0-440MHz.csv` are the BOMs for each frequency version (pick one). Make sure visually that all components (except the 220/440 indicator resistor) are populated. If the default STM32WLE5CBU6 is unavailable, the STM32WLE5CCU6 can be selected instead (works with the same firmware).
+The assembled PCB can be ordered by uploading the files from `Hardware\beacon\jlcpcb\production_files\V1.0` to JLCPCB. These files are also available in releases as a zip file. `GERBER-beacon.zip` contains the PCB files. For the pick-and-place centroid file, pick either `CPL-beacon-no-pinheader.csv` (cheaper and more compact) or `CPL-beacon-with-pinheader.csv` (assembled with pinheader). `BOM-beacon-v1.0-220MHz.csv` or `BOM-beacon-v1.0-440MHz.csv` are the BOMs for each frequency version (pick one). Make sure visually that all components (except the 220/440 indicator resistor) are populated. If the default STM32WLE5CBU6 is unavailable, the STM32WLE5CCU6 can be selected instead (works with the same firmware).
 
 Use the following settings when ordering:
 
 * Layers=2
 * Thickness=1.6
 * Vias=Tented
-* Remove order number=Specify a location
+* Mark on PCB=Order Number(Specify Position)
 * PCBA type=Economic
 * Assembly side=Top side
 * Tooling holes = Added by Customer
